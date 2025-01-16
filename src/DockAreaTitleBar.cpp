@@ -60,7 +60,6 @@
 
 namespace ads
 {
-static const char* const LocationProperty = "Location";
 
 /**
  * Private data class of CDockAreaTitleBar class (pimpl)
@@ -116,6 +115,14 @@ struct DockAreaTitleBarPrivate
 	}
 
 	/**
+	 * Convenience function for access to dock manager components factory
+	 */
+	QSharedPointer<ads::CDockComponentsFactory> componentsFactory() const
+	{
+        return dockManager()->componentsFactory();
+    }
+
+	/**
 	 * Returns true if the given config flag is set
 	 * Convenience function to ease config flag testing
 	 */
@@ -159,7 +166,7 @@ struct DockAreaTitleBarPrivate
 		QMenu* Menu)
 	{
 		auto Action = Menu->addAction(Title);
-		Action->setProperty("Location", Location);
+		Action->setProperty(internal::LocationProperty, Location);
 		QObject::connect(Action, &QAction::triggered, _this, &CDockAreaTitleBar::onAutoHideToActionClicked);
 		return Action;
 	}
@@ -179,7 +186,8 @@ void DockAreaTitleBarPrivate::createButtons()
 	QSizePolicy ButtonSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
 
 	// Tabs menu button
-	TabsMenuButton = new CTitleBarButton(testConfigFlag(CDockManager::DockAreaHasTabsMenuButton));
+	TabsMenuButton = new CTitleBarButton(testConfigFlag(CDockManager::DockAreaHasTabsMenuButton),
+		false, TitleBarButtonTabsMenu);
 	TabsMenuButton->setObjectName("tabsMenuButton");
 	TabsMenuButton->setAutoRaise(true);
 	TabsMenuButton->setPopupMode(QToolButton::InstantPopup);
@@ -197,7 +205,8 @@ void DockAreaTitleBarPrivate::createButtons()
 		SLOT(onTabsMenuActionTriggered(QAction*)));
 
 	// Undock button
-	UndockButton = new CTitleBarButton(testConfigFlag(CDockManager::DockAreaHasUndockButton));
+	UndockButton = new CTitleBarButton(testConfigFlag(CDockManager::DockAreaHasUndockButton),
+		true, TitleBarButtonUndock);
 	UndockButton->setObjectName("detachGroupButton");
 	UndockButton->setAutoRaise(true);
 	internal::setToolTip(UndockButton, QObject::tr("Detach Group"));
@@ -208,7 +217,8 @@ void DockAreaTitleBarPrivate::createButtons()
 
 	// AutoHide Button
 	const auto autoHideEnabled = testAutoHideConfigFlag(CDockManager::AutoHideFeatureEnabled);
-	AutoHideButton = new CTitleBarButton(testAutoHideConfigFlag(CDockManager::DockAreaHasAutoHideButton) && autoHideEnabled);
+	AutoHideButton = new CTitleBarButton(testAutoHideConfigFlag(CDockManager::DockAreaHasAutoHideButton) && autoHideEnabled,
+		true, TitleBarButtonAutoHide);
 	AutoHideButton->setObjectName("dockAreaAutoHideButton");
 	AutoHideButton->setAutoRaise(true);
 	internal::setToolTip(AutoHideButton, _this->titleBarButtonToolTip(TitleBarButtonAutoHide));
@@ -220,7 +230,8 @@ void DockAreaTitleBarPrivate::createButtons()
 	_this->connect(AutoHideButton, SIGNAL(clicked()),  SLOT(onAutoHideButtonClicked()));
 
 	// Minimize button
-	MinimizeButton = new CTitleBarButton(testAutoHideConfigFlag(CDockManager::AutoHideHasMinimizeButton));
+	MinimizeButton = new CTitleBarButton(testAutoHideConfigFlag(CDockManager::AutoHideHasMinimizeButton),
+		false, TitleBarButtonMinimize);
 	MinimizeButton->setObjectName("dockAreaMinimizeButton");
 	MinimizeButton->setAutoRaise(true);
 	MinimizeButton->setVisible(false);
@@ -231,7 +242,8 @@ void DockAreaTitleBarPrivate::createButtons()
 	_this->connect(MinimizeButton, SIGNAL(clicked()), SLOT(minimizeAutoHideContainer()));
 
 	// Close button
-	CloseButton = new CTitleBarButton(testConfigFlag(CDockManager::DockAreaHasCloseButton));
+	CloseButton = new CTitleBarButton(testConfigFlag(CDockManager::DockAreaHasCloseButton),
+		true, TitleBarButtonClose);
 	CloseButton->setObjectName("dockAreaCloseButton");
 	CloseButton->setAutoRaise(true);
 	internal::setButtonIcon(CloseButton, QStyle::SP_TitleBarCloseButton, ads::DockAreaCloseIcon);
@@ -373,27 +385,51 @@ CDockAreaTabBar* CDockAreaTitleBar::tabBar() const
 	return d->TabBar;
 }
 
+
+//============================================================================
+void CDockAreaTitleBar::resizeEvent(QResizeEvent *event)
+{
+	Super::resizeEvent(event);
+	if (CDockManager::testConfigFlag(CDockManager::DockAreaDynamicTabsMenuButtonVisibility)
+	 && CDockManager::testConfigFlag(CDockManager::DisableTabTextEliding))
+	{
+		// Use queued connection to ensure that the resizing and relayouting has
+		// finished to ensure that the d->TabBar->areTabsOverflowing() function
+		// returns the correct value
+		QMetaObject::invokeMethod(this, "markTabsMenuOutdated", Qt::QueuedConnection);
+	}
+}
+
+
 //============================================================================
 void CDockAreaTitleBar::markTabsMenuOutdated()
 {
-	if(DockAreaTitleBarPrivate::testConfigFlag(CDockManager::DockAreaDynamicTabsMenuButtonVisibility))
+	if (CDockManager::testConfigFlag(CDockManager::DockAreaDynamicTabsMenuButtonVisibility))
 	{
-		bool hasElidedTabTitle = false;
-		for (int i = 0; i < d->TabBar->count(); ++i)
+		bool TabsMenuButtonVisible = false;
+		if (CDockManager::testConfigFlag(CDockManager::DisableTabTextEliding))
 		{
-			if (!d->TabBar->isTabOpen(i))
-			{
-				continue;
-			}
-			CDockWidgetTab* Tab = d->TabBar->tab(i);
-			if(Tab->isTitleElided())
-			{
-				hasElidedTabTitle = true;
-				break;
-			}
+			TabsMenuButtonVisible = d->TabBar->areTabsOverflowing();
 		}
-		bool visible = (hasElidedTabTitle && (d->TabBar->count() > 1));
-		QMetaObject::invokeMethod(d->TabsMenuButton, "setVisible", Qt::QueuedConnection, Q_ARG(bool, visible));
+		else
+		{
+			bool hasElidedTabTitle = false;
+			for (int i = 0; i < d->TabBar->count(); ++i)
+			{
+				if (!d->TabBar->isTabOpen(i))
+				{
+					continue;
+				}
+				CDockWidgetTab* Tab = d->TabBar->tab(i);
+				if(Tab->isTitleElided())
+				{
+					hasElidedTabTitle = true;
+					break;
+				}
+			}
+			TabsMenuButtonVisible = (hasElidedTabTitle && (d->TabBar->count() > 1));
+		}
+		QMetaObject::invokeMethod(d->TabsMenuButton, "setVisible", Qt::QueuedConnection, Q_ARG(bool, TabsMenuButtonVisible));
 	}
 	d->MenuOutdated = true;
 }
@@ -510,7 +546,7 @@ void CDockAreaTitleBar::updateDockWidgetActionsButtons()
 	int InsertIndex = indexOf(d->TabsMenuButton);
 	for (auto Action : Actions)
 	{
-		auto Button = new CTitleBarButton(true, this);
+		auto Button = new CTitleBarButton(true, false, TitleBarButtonTabsMenu, this);
 		Button->setDefaultAction(Action);
 		Button->setAutoRaise(true);
 		Button->setPopupMode(QToolButton::InstantPopup);
@@ -564,7 +600,7 @@ void CDockAreaTitleBar::onAutoHideDockAreaActionClicked()
 //============================================================================
 void CDockAreaTitleBar::onAutoHideToActionClicked()
 {
-	int Location = sender()->property(LocationProperty).toInt();
+	int Location = sender()->property(internal::LocationProperty).toInt();
 	d->DockArea->toggleAutoHide((SideBarLocation)Location);
 }
 
@@ -705,6 +741,11 @@ void CDockAreaTitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 		return;
 	}
 
+	if (!CDockManager::testConfigFlag(CDockManager::DoubleClickUndocksWidget))
+	{
+		return;
+	}
+
 	d->makeAreaFloating(event->pos(), DraggingInactive);
 }
 
@@ -740,24 +781,35 @@ void CDockAreaTitleBar::contextMenuEvent(QContextMenuEvent* ev)
 		return;
 	}
 
-	const bool isAutoHide = d->DockArea->isAutoHide();
+    auto Menu = buildContextMenu(nullptr);
+	Menu->exec(ev->globalPos());
+    delete Menu;
+}
+
+QMenu* CDockAreaTitleBar::buildContextMenu(QMenu *Menu)
+{
+    const bool isAutoHide = d->DockArea->isAutoHide();
 	const bool isTopLevelArea = d->DockArea->isTopLevelArea();
 	QAction* Action;
-	QMenu Menu(this);
-	if (!isTopLevelArea)
+    if (Menu == nullptr)
+    {
+        Menu = new QMenu(this);
+    }
+    
+    if (!isTopLevelArea)
 	{
-		Action = Menu.addAction(isAutoHide ? tr("Detach") : tr("Detach Group"),
+		Action = Menu->addAction(isAutoHide ? tr("Detach") : tr("Detach Group"),
 			this, SLOT(onUndockButtonClicked()));
 		Action->setEnabled(d->DockArea->features().testFlag(CDockWidget::DockWidgetFloatable));
 		if (CDockManager::testAutoHideConfigFlag(CDockManager::AutoHideFeatureEnabled))
 		{
-			Action = Menu.addAction(isAutoHide ? tr("Unpin (Dock)") : tr("Pin Group"), this, SLOT(onAutoHideDockAreaActionClicked()));
+			Action = Menu->addAction(isAutoHide ? tr("Unpin (Dock)") : tr("Pin Group"), this, SLOT(onAutoHideDockAreaActionClicked()));
 			auto AreaIsPinnable = d->DockArea->features().testFlag(CDockWidget::DockWidgetPinnable);
 			Action->setEnabled(AreaIsPinnable);
 
 			if (!isAutoHide)
 			{
-				auto menu = Menu.addMenu(tr("Pin Group To..."));
+				auto menu = Menu->addMenu(tr("Pin Group To..."));
 				menu->setEnabled(AreaIsPinnable);
 				d->createAutoHideToAction(tr("Top"), SideBarTop, menu);
 				d->createAutoHideToAction(tr("Left"), SideBarLeft, menu);
@@ -765,27 +817,26 @@ void CDockAreaTitleBar::contextMenuEvent(QContextMenuEvent* ev)
 				d->createAutoHideToAction(tr("Bottom"), SideBarBottom, menu);
 			}
 		}
-		Menu.addSeparator();
+		Menu->addSeparator();
 	}
 
 	if (isAutoHide)
 	{
-		Action = Menu.addAction(tr("Minimize"), this, SLOT(minimizeAutoHideContainer()));
-		Action = Menu.addAction(tr("Close"), this, SLOT(onAutoHideCloseActionTriggered()));
+		Action = Menu->addAction(tr("Minimize"), this, SLOT(minimizeAutoHideContainer()));
+		Action = Menu->addAction(tr("Close"), this, SLOT(onAutoHideCloseActionTriggered()));
 	}
 	else
 	{
-		Action = Menu.addAction(isAutoHide ? tr("Close") : tr("Close Group"), this, SLOT(onCloseButtonClicked()));
+		Action = Menu->addAction(isAutoHide ? tr("Close") : tr("Close Group"), this, SLOT(onCloseButtonClicked()));
 	}
 
 	Action->setEnabled(d->DockArea->features().testFlag(CDockWidget::DockWidgetClosable));
 	if (!isAutoHide && !isTopLevelArea)
 	{
-		Action = Menu.addAction(tr("Close Other Groups"), d->DockArea, SLOT(closeOtherAreas()));
+		Action = Menu->addAction(tr("Close Other Groups"), d->DockArea, SLOT(closeOtherAreas()));
 	}
-	Menu.exec(ev->globalPos());
+    return Menu;
 }
-
 
 //============================================================================
 void CDockAreaTitleBar::insertWidget(int index, QWidget *widget)
@@ -856,10 +907,25 @@ void CDockAreaTitleBar::showAutoHideControls(bool Show)
 
 
 //============================================================================
-CTitleBarButton::CTitleBarButton(bool showInTitleBar, QWidget* parent)
+bool CDockAreaTitleBar::isAutoHide() const
+{
+	return d->DockArea && d->DockArea->isAutoHide();
+}
+
+
+//============================================================================
+CDockAreaWidget* CDockAreaTitleBar::dockAreaWidget() const
+{
+	return d->DockArea;
+}
+
+
+//============================================================================
+CTitleBarButton::CTitleBarButton(bool showInTitleBar, bool hideWhenDisabled, TitleBarButton ButtonId, QWidget* parent)
 	: tTitleBarButton(parent),
 	  ShowInTitleBar(showInTitleBar),
-	  HideWhenDisabled(CDockManager::testConfigFlag(CDockManager::DockAreaHideDisabledButtons))
+	  HideWhenDisabled(CDockManager::testConfigFlag(CDockManager::DockAreaHideDisabledButtons) && hideWhenDisabled),
+	  TitleBarButtonId(ButtonId)
 {
     setFocusPolicy(Qt::NoFocus);
 }
@@ -894,15 +960,46 @@ void CTitleBarButton::setShowInTitleBar(bool Show)
 //============================================================================
 bool CTitleBarButton::event(QEvent *ev)
 {
-	if (QEvent::EnabledChange == ev->type() && HideWhenDisabled)
+	if (QEvent::EnabledChange != ev->type() || !HideWhenDisabled || !ShowInTitleBar)
 	{
-		// force setVisible() call 
-		// Calling setVisible() directly here doesn't work well when button is expected to be shown first time
-		QMetaObject::invokeMethod(this, "setVisible", Qt::QueuedConnection, Q_ARG(bool, isEnabled()));
+		return Super::event(ev);
 	}
+
+	bool Show = true;
+	if (isInAutoHideArea())
+	{
+		switch (TitleBarButtonId)
+        {
+		case TitleBarButtonClose: Show = CDockManager::testAutoHideConfigFlag(CDockManager::AutoHideHasCloseButton); break;
+		case TitleBarButtonUndock: Show = false; break;
+		default:
+			break;
+        }
+	}
+
+	// force setVisible() call - Calling setVisible() directly here doesn't
+	// work well when button is expected to be shown first time
+	QMetaObject::invokeMethod(this, "setVisible", Qt::QueuedConnection,
+		Q_ARG(bool, isEnabledTo(this->parentWidget()) & Show));
 
 	return Super::event(ev);
 }
+
+
+//============================================================================
+CDockAreaTitleBar* CTitleBarButton::titleBar() const
+{
+	return qobject_cast<CDockAreaTitleBar*>(parentWidget());
+}
+
+
+//============================================================================
+bool CTitleBarButton::isInAutoHideArea() const
+{
+	auto TitleBar = titleBar();
+    return TitleBar && TitleBar->isAutoHide();
+}
+
 
 //============================================================================
 CSpacerWidget::CSpacerWidget(QWidget* Parent /*= 0*/) : Super(Parent)

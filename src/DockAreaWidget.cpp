@@ -34,7 +34,6 @@
 
 #include <QStackedLayout>
 #include <QScrollBar>
-#include <QWheelEvent>
 #include <QStyle>
 #include <QPushButton>
 #include <QDebug>
@@ -271,6 +270,14 @@ struct DockAreaWidgetPrivate
 	DockAreaWidgetPrivate(CDockAreaWidget* _public);
 
 	/**
+	 * Convenience function to ease components factory access
+	 */
+	QSharedPointer<ads::CDockComponentsFactory> componentsFactory() const
+	{
+        return DockManager->componentsFactory();
+    }
+
+	/**
 	 * Creates the layout for top area with tabs and close button
 	 */
 	void createTitleBar();
@@ -370,10 +377,21 @@ void DockAreaWidgetPrivate::updateTitleBarButtonStates()
 		return;
 	}
 
-	TitleBar->button(TitleBarButtonClose)->setEnabled(
-		_this->features().testFlag(CDockWidget::DockWidgetClosable));
-	TitleBar->button(TitleBarButtonUndock)->setEnabled(
-		_this->features().testFlag(CDockWidget::DockWidgetFloatable));
+	if (_this->isAutoHide())
+	{
+		if (CDockManager::testAutoHideConfigFlag(CDockManager::AutoHideHasCloseButton))
+        {
+			TitleBar->button(TitleBarButtonClose)->setEnabled(
+				_this->features().testFlag(CDockWidget::DockWidgetClosable));
+        }
+	}
+	else
+	{
+		TitleBar->button(TitleBarButtonUndock)->setEnabled(
+			_this->features().testFlag(CDockWidget::DockWidgetFloatable));
+		TitleBar->button(TitleBarButtonClose)->setEnabled(
+			_this->features().testFlag(CDockWidget::DockWidgetClosable));
+	}
 	TitleBar->button(TitleBarButtonAutoHide)->setEnabled(
 		_this->features().testFlag(CDockWidget::DockWidgetPinnable));
 	TitleBar->updateDockWidgetActionsButtons();
@@ -393,7 +411,7 @@ void DockAreaWidgetPrivate::updateTitleBarButtonVisibility(bool IsTopLevel)
 	bool IsAutoHide = _this->isAutoHide();
 	if (IsAutoHide)
 	{
-		bool ShowCloseButton = CDockManager::autoHideConfigFlags().testFlag(CDockManager::AutoHideHasCloseButton);
+		bool ShowCloseButton = CDockManager::testAutoHideConfigFlag(CDockManager::AutoHideHasCloseButton);
 		TitleBar->button(TitleBarButtonClose)->setVisible(ShowCloseButton);
 		TitleBar->button(TitleBarButtonAutoHide)->setVisible(true);
 		TitleBar->button(TitleBarButtonUndock)->setVisible(false);
@@ -410,7 +428,8 @@ void DockAreaWidgetPrivate::updateTitleBarButtonVisibility(bool IsTopLevel)
 	else
 	{
 		TitleBar->button(TitleBarButtonClose)->setVisible(true);
-		TitleBar->button(TitleBarButtonAutoHide)->setVisible(true);
+		bool ShowAutoHideButton = CDockManager::testAutoHideConfigFlag(CDockManager::DockAreaHasAutoHideButton);
+		TitleBar->button(TitleBarButtonAutoHide)->setVisible(ShowAutoHideButton);
 		TitleBar->button(TitleBarButtonUndock)->setVisible(true);
         TitleBar->button(TitleBarButtonTabsMenu)->setVisible(true);
 	}

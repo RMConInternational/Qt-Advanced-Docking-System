@@ -43,6 +43,7 @@ class CDockAreaTabBar;
 class CDockAreaWidget;
 struct DockAreaTitleBarPrivate;
 class CElidingLabel;
+class CDockAreaTitleBar;
 
 using tTitleBarButton = QToolButton;
 
@@ -59,10 +60,12 @@ class CTitleBarButton : public tTitleBarButton
 private:
 	bool ShowInTitleBar = true;
 	bool HideWhenDisabled = false;
+	TitleBarButton TitleBarButtonId;
 
 public:
 	using Super = tTitleBarButton;
-	CTitleBarButton(bool ShowInTitleBar = true, QWidget* parent = nullptr);
+	CTitleBarButton(bool ShowInTitleBar, bool HideWhenDisabled, TitleBarButton ButtonId,
+		QWidget* parent = nullptr);
 
 	/**
 	* Adjust this visibility change request with our internal settings:
@@ -73,6 +76,22 @@ public:
 	 * Configures, if the title bar button should be shown in title bar
 	 */
 	void setShowInTitleBar(bool Show);
+
+	/**
+	 * Identifier for the title bar button
+	 */
+	TitleBarButton buttonId() const {return TitleBarButtonId;}
+
+	/**
+	 * Return the title bar that contains this button
+     */
+	CDockAreaTitleBar* titleBar() const;
+
+	/**
+	 * Returns true, if the button is in a title bar in an auto hide area
+	 */
+	bool isInAutoHideArea() const;
+
 
 protected:
 	/**
@@ -133,6 +152,11 @@ protected:
 	 */
 	virtual void contextMenuEvent(QContextMenuEvent *event) override;
 
+	/**
+	 * Handle resize events
+	 */
+	virtual void resizeEvent(QResizeEvent *event) override;
+
 public Q_SLOTS:
 	/**
 	 * Call this slot to tell the title bar that it should update the tabs menu
@@ -168,6 +192,11 @@ public:
 	 * Returns the auto hide title label, used when the dock area is expanded and auto hidden
 	 */
 	CElidingLabel* autoHideTitleLabel() const;
+
+	/**
+     * Returns the dock area widget that contains this title bar
+     */
+	CDockAreaWidget* dockAreaWidget() const;
 
 	/**
 	 * Updates the visibility of the dock widget actions in the title bar
@@ -214,6 +243,25 @@ public:
 	 * Call this function, to create all the required auto hide controls
 	 */
 	void showAutoHideControls(bool Show);
+
+	/**
+	 * Returns true, if the auto hide controls are visible
+	 */
+	bool isAutoHide() const;
+
+    /**
+     * Fills the provided menu with standard entries. If a nullptr is passed, a
+     * new menu is created and filled with standard entries.
+     * This function is called from the actual version of contextMenuEvent, but
+     * can be called from any code. Caller is responsible of deleting the created
+     * object.
+     *
+     * @param menu The QMenu to fill with standard entries. If nullptr, a new
+     * QMenu will be created.
+     * @return The filled QMenu, either the provided one or a newly created one if
+     * nullptr was passed.
+     */
+    virtual QMenu *buildContextMenu(QMenu *);
 
 Q_SIGNALS:
 	/**

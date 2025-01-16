@@ -158,7 +158,7 @@ enum SideBarLocation
 	SideBarBottom,
 	SideBarNone
 };
-Q_ENUMS(SideBarLocation);
+Q_ENUMS(SideBarLocation)
 
 
 namespace internal
@@ -167,6 +167,7 @@ static const bool RestoreTesting = true;
 static const bool Restore = false;
 static const char* const ClosedProperty = "close";
 static const char* const DirtyProperty = "dirty";
+static const char* const LocationProperty = "Location";
 extern const int FloatingWidgetDragStartEvent;
 extern const int DockedWidgetDragStartEvent;
 
@@ -235,7 +236,7 @@ SideBarLocation toSideBarLocation(DockWidgetArea Area);
 
 
 /**
- * Returns true for the top or bottom side bar ansd false for the
+ * Returns true for the top or bottom side bar and false for the
  * left and right side bar
  */
 bool isHorizontalSideBarLocation(SideBarLocation Location);

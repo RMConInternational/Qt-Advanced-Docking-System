@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project(QtAdvancedDockingSystem LANGUAGES CXX VERSION ${VERSION_SHORT})
+include(GNUInstallDirs)
 if (${QT_VERSION_MAJOR})
   message(STATUS "Forced to use Qt version ${QT_VERSION_MAJOR}")
   find_package(QT NAMES Qt${QT_VERSION_MAJOR} COMPONENTS Core REQUIRED)
@@ -36,7 +37,7 @@ set(ads_SRCS
     AutoHideTab.cpp
     AutoHideDockContainer.cpp
     PushButton.cpp
-	ResizeHandle.cpp
+    ResizeHandle.cpp
     ads.qrc
 )
 set(ads_HEADERS
@@ -62,7 +63,7 @@ set(ads_HEADERS
     AutoHideTab.h
     AutoHideDockContainer.h
     PushButton.h
-	ResizeHandle.h
+    ResizeHandle.h
 )
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 if (UNIX AND NOT APPLE)
@@ -70,7 +71,7 @@ if (UNIX AND NOT APPLE)
     set(ads_HEADERS linux/FloatingWidgetTitleBar.h ${ads_HEADERS})
 endif()
 
-set(library_name "qt${QT_VERSION_MAJOR}advanceddocking")
+set(library_name "qtadvanceddocking-qt${QT_VERSION_MAJOR}")
 if(BUILD_STATIC)
     add_library(${library_name} STATIC ${ads_SRCS} ${ads_HEADERS})
     target_compile_definitions( ${library_name} PUBLIC ADS_STATIC)
@@ -120,7 +121,7 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 install(FILES ${ads_HEADERS}
-    DESTINATION include/${library_name}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${library_name}
     COMPONENT headers
 )
 install(FILES
@@ -131,25 +132,25 @@ install(FILES
 )
 install(TARGETS ${library_name}
     EXPORT adsTargets
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    INCLUDES DESTINATION include/${library_name}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${library_name}
 )
 
 install(EXPORT adsTargets
     FILE adsTargets.cmake
     NAMESPACE ads::
-    DESTINATION lib/cmake/${library_name}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${library_name}
 )
 install(FILES qtadvanceddockingConfig.cmake RENAME ${library_name}Config.cmake
-    DESTINATION lib/cmake/${library_name}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${library_name}
 )
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${library_name}ConfigVersion.cmake"
-    DESTINATION lib/cmake/${library_name}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${library_name}
 )
 
 target_include_directories(${library_name} PUBLIC
-    $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )

@@ -368,7 +368,7 @@ The application can be compiled for macOS. A user reported, that the library wor
 [![Build Status](https://travis-ci.org/githubuser0xFFFF/Qt-Advanced-Docking-System.svg?branch=master)](https://travis-ci.org/githubuser0xFFFF/Qt-Advanced-Docking-System)
 [![Build status](https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/workflows/linux-builds/badge.svg)](https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/actions?query=workflow%3Alinux-builds)
 
-Unfortunately, there is no such thing as a Linux operating system. Linux is a heterogeneous environment with a variety of different distributions. So it is not possible to support "Linux" like this is possible for Windows. It is only possible to support and test a small subset of Linux distributions. The library can be compiled for and has been developed and tested with the some Linux distributions. Depending on the used window manager or compositor, dock widgets
+Unfortunately, there is no such thing as a Linux operating system. Linux is a heterogeneous environment with a variety of different distributions. So it is not possible to support "Linux" like it is possible for Windows. It is only possible to support and test a small subset of Linux distributions. The library can be compiled for and has been developed and tested with some Linux distributions. Depending on the used window manager or compositor, dock widgets
 with native title bars are supported or not. If native title bars are not supported,
 the library switches to `QWidget` based title bars.
 
@@ -462,7 +462,7 @@ MainWindow::MainWindow(QWidget *parent) :
     // Create the dock manager after the ui is setup. Because the
     // parent parameter is a QMainWindow the dock manager registers
     // itself as the central widget as such the ui must be set up first.
-    m_DockManager = new ads::CDockManager(this);
+    DockManager = new ads::CDockManager(this);
 
     // Create example content label - this can be any application specific
     // widget
@@ -473,7 +473,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     // Create a dock widget with the title Label 1 and set the created label
     // as the dock widget content
-    ads::CDockWidget* DockWidget = new ads::CDockWidget("Label 1");
+    ads::CDockWidget* DockWidget = DockManager->createDockWidget("Label 1");
     DockWidget->setWidget(l);
 
     // Add the toggleViewAction of the dock widget to the menu to give
@@ -481,7 +481,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->menuView->addAction(DockWidget->toggleViewAction());
 
     // Add the dock widget to the top dock widget area
-    m_DockManager->addDockWidget(ads::TopDockWidgetArea, DockWidget);
+    DockManager->addDockWidget(ads::TopDockWidgetArea, DockWidget);
 }
 
 MainWindow::~MainWindow()
@@ -582,7 +582,7 @@ highlights are:
 - Simple Drag & Drop user interface.
 - Load data from file.
 - Connect to live streaming of data.
-- Save the visualization layout and configurations to re-use them later.
+- Save the visualization layout and configurations to reuse them later.
 - Fast OpenGL visualization.
 - Can handle thousands of timeseries and millions of data points.
 - Transform your data using a simple editor: derivative, moving average, integral, etc…

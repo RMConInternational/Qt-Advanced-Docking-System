@@ -92,7 +92,7 @@ xcb_atom_t xcb_get_atom(const char *name)
 	}
 	xcb_connection_t *connection = x11_connection();
 	xcb_intern_atom_cookie_t request = xcb_intern_atom(connection, 1, strlen(name), name);
-	xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(connection, request, NULL);
+	xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(connection, request, nullptr);
 	if (!reply)
 	{
 		return XCB_ATOM_NONE;
@@ -283,7 +283,7 @@ QString detectWindowManagerX11()
 	}
 	if(sup_windows.length() == 0)
 	{
-		ADS_PRINT("Failed to get the supporting window on non EWMH comform WM.");
+		ADS_PRINT("Failed to get the supporting window on non EWMH conform WM.");
 		return "UNKNOWN";
 	}
 	support_win = sup_windows[0];

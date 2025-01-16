@@ -80,7 +80,7 @@ struct DockWidgetPrivate
 	QWidget* Widget = nullptr;
 	CDockWidgetTab* TabWidget = nullptr;
 	CDockWidget::DockWidgetFeatures Features = CDockWidget::DefaultDockWidgetFeatures;
-	CDockManager* DockManager = nullptr;
+	QPointer<CDockManager> DockManager;
 	QPointer<CDockAreaWidget> DockArea;
 	QAction* ToggleViewAction = nullptr;
 	bool Closed = false;
@@ -101,6 +101,14 @@ struct DockWidgetPrivate
 	 * Private data constructor
 	 */
 	DockWidgetPrivate(CDockWidget* _public);
+
+	/**
+	 * Convenience function to ease components factory access
+	 */
+	QSharedPointer<ads::CDockComponentsFactory> componentsFactory() const
+	{
+        return DockManager ? DockManager->componentsFactory() : CDockComponentsFactory::factory();
+    }
 
 	/**
 	 * Show dock widget
@@ -271,7 +279,10 @@ void DockWidgetPrivate::closeAutoHideDockWidgetsIfNeeded()
 		return;
 	}
 
-	if (!DockContainer->openedDockWidgets().isEmpty())
+	// If the dock container is the dock manager, or if it is not empty, then we
+	// don't need to do anything
+	if ((DockContainer == _this->dockManager())
+	 || !DockContainer->openedDockWidgets().isEmpty())
 	{
 		return;
 	}
@@ -355,9 +366,17 @@ void DockWidgetPrivate::setToolBarStyleFromDockManager()
 
 //============================================================================
 CDockWidget::CDockWidget(const QString &title, QWidget *parent) :
-	QFrame(parent),
-	d(new DockWidgetPrivate(this))
+      CDockWidget(nullptr, title, parent)
 {
+}
+
+
+//============================================================================
+CDockWidget::CDockWidget(CDockManager *manager, const QString &title, QWidget* parent)
+	: QFrame(parent),
+	  d(new DockWidgetPrivate(this))
+{
+	d->DockManager = manager;
 	d->Layout = new QBoxLayout(QBoxLayout::TopToBottom);
 	d->Layout->setContentsMargins(0, 0, 0, 0);
 	d->Layout->setSpacing(0);
@@ -365,7 +384,7 @@ CDockWidget::CDockWidget(const QString &title, QWidget *parent) :
 	setWindowTitle(title);
 	setObjectName(title);
 
-	d->TabWidget = componentsFactory()->createDockWidgetTab(this);
+	d->TabWidget = d->componentsFactory()->createDockWidgetTab(this);
 
 	d->ToggleViewAction = new QAction(title, this);
 	d->ToggleViewAction->setCheckable(true);
@@ -379,10 +398,11 @@ CDockWidget::CDockWidget(const QString &title, QWidget *parent) :
 	}
 }
 
+
 //============================================================================
 CDockWidget::~CDockWidget()
 {
-	ADS_PRINT("~CDockWidget()");
+    ADS_PRINT("~CDockWidget(): " << this->windowTitle());
 	delete d;
 }
 
@@ -511,10 +531,19 @@ void CDockWidget::setFeatures(DockWidgetFeatures features)
 		return;
 	}
 	d->Features = features;
+	notifyFeaturesChanged();
+}
+
+
+//============================================================================
+void CDockWidget::notifyFeaturesChanged()
+{
 	Q_EMIT featuresChanged(d->Features);
 	d->TabWidget->onDockWidgetFeaturesChanged();
 	if(CDockAreaWidget* DockArea = dockAreaWidget())
+	{
 		DockArea->onDockWidgetFeaturesChanged();
+	}
 }
 
 
@@ -530,7 +559,14 @@ void CDockWidget::setFeature(DockWidgetFeature flag, bool on)
 //============================================================================
 CDockWidget::DockWidgetFeatures CDockWidget::features() const
 {
-	return d->Features;
+	if (d->DockManager)
+	{
+		return d->Features &~ d->DockManager->globallyLockedDockWidgetFeatures();
+	}
+	else
+	{
+		return d->Features;
+	}
 }
 
 
@@ -566,7 +602,7 @@ CDockContainerWidget* CDockWidget::dockContainer() const
 	}
 	else
 	{
-		return 0;
+		return nullptr;
 	}
 }
 
